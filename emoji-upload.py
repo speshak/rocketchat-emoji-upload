@@ -6,9 +6,11 @@ from bson.json_util import loads
 import json
 import yaml
 import urllib2
+import traceback
+import sys
 
-emoji_yaml_url = raw_input("URL for YAML file?")
-mongo_server = raw_input("MongoDB URI for your rocketchat deployment?")
+emoji_yaml_url = sys.argv[1]
+mongo_server = 'localhost'
 
 response = urllib2.urlopen(emoji_yaml_url)
 emoji_yaml = yaml.load(response.read())
@@ -17,13 +19,12 @@ emoji_yaml = yaml.load(response.read())
 emojis = emoji_yaml['emojis']
 
 
-
 # create timestamp for entry into list for DB
 ts = time.time()
 ts = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
-#make connection to mongo
+# make connection to mongo
 client = MongoClient(mongo_server)
 db = client.rocketchat
 
@@ -34,15 +35,17 @@ def gfs_fileuploader(name, content, url):
     opener = urllib2.build_opener()
     # change user agent to wget, for some reason CDN does not like urillib2
     opener.addheaders = [('User-Agent', 'Wget/1.19.1 (darwin16.6.0)')]
+    urllib2.install_opener(opener)
+
     emoji_resp = opener.open(url)
     emoji_file = emoji_resp.read()
+
     with custom_emoji.new_file(
         _id=name,
-        filename=name  ,
+        filename=name,
         content_type=content,
         alias=None) as fp:
         fp.write(emoji_file)
-    return;
 
 
 # download image files and make Array for DB entries
@@ -65,14 +68,18 @@ for emoji in emojis:
                 "aliases": [],
                 "extension": ext,
                 "_updatedAt": {
-                    "$date": ts }
+                    "$date": ts
+                    }
                 }
         item = json.dumps(item)
+        import pprint
+        pprint.pprint(item)
         item = loads(item)
         new_emojis.append(item)
-    except:
+    except Exception as e:
         print "error getting image"
-        pass
+        traceback.print_exc(e)
+        traceback.print_tb(e)
 
 
 
